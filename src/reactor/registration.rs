@@ -1,6 +1,6 @@
 use super::{Direction, HandlePriv};
 
-use futures::task::LocalWaker;
+use futures::task::Waker;
 use futures::Poll;
 use mio::{self, Evented};
 
@@ -65,7 +65,7 @@ struct Inner {
 #[derive(Debug)]
 struct Node {
     direction: Direction,
-    waker: *const LocalWaker,
+    waker: *const Waker,
     next: *mut Node,
 }
 
@@ -248,7 +248,7 @@ impl Registration {
     /// # Panics
     ///
     /// This function will panic if called from outside of a task context.
-    pub fn poll_read_ready(&self, lw: &LocalWaker) -> Poll<io::Result<mio::Ready>> {
+    pub fn poll_read_ready(&self, lw: &Waker) -> Poll<io::Result<mio::Ready>> {
         match self.poll_ready(Some(lw), Direction::Read) {
             Ok(Some(v)) => Poll::Ready(Ok(v)),
             Ok(None) => Poll::Pending,
@@ -299,7 +299,7 @@ impl Registration {
     /// # Panics
     ///
     /// This function will panic if called from outside of a task context.
-    pub fn poll_write_ready(&self, lw: &LocalWaker) -> Poll<io::Result<mio::Ready>> {
+    pub fn poll_write_ready(&self, lw: &Waker) -> Poll<io::Result<mio::Ready>> {
         match self.poll_ready(Some(lw), Direction::Write) {
             Ok(Some(v)) => Poll::Ready(Ok(v)),
             Ok(None) => Poll::Pending,
@@ -320,7 +320,7 @@ impl Registration {
 
     fn poll_ready(
         &self,
-        lw: Option<&LocalWaker>,
+        lw: Option<&Waker>,
         direction: Direction,
     ) -> io::Result<Option<mio::Ready>> {
         let mut state = self.state.load(SeqCst);
@@ -355,7 +355,7 @@ impl Registration {
                     let mut n = node.take().unwrap_or_else(|| {
                         Box::new(Node {
                             direction,
-                            waker: lw as *const LocalWaker,
+                            waker: lw as *const Waker,
                             next: ptr::null_mut(),
                         })
                     });
@@ -414,7 +414,7 @@ impl Inner {
         (inner, res)
     }
 
-    fn register(&self, lw: &LocalWaker, direction: Direction) {
+    fn register(&self, lw: &Waker, direction: Direction) {
         if self.token == ERROR {
             lw.wake();
             return;
@@ -449,7 +449,7 @@ impl Inner {
 
     fn poll_ready(
         &self,
-        lw: Option<&LocalWaker>,
+        lw: Option<&Waker>,
         direction: Direction,
     ) -> io::Result<Option<mio::Ready>> {
         if self.token == ERROR {

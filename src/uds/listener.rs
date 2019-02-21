@@ -2,7 +2,7 @@ use super::UnixStream;
 
 use crate::reactor::PollEvented;
 
-use futures::task::LocalWaker;
+use futures::task::Waker;
 use futures::{ready, Poll, Stream};
 use mio_uds;
 
@@ -128,14 +128,14 @@ impl UnixListener {
         Incoming::new(self)
     }
 
-    fn poll_accept(&self, lw: &LocalWaker) -> Poll<io::Result<(UnixStream, SocketAddr)>> {
+    fn poll_accept(&self, lw: &Waker) -> Poll<io::Result<(UnixStream, SocketAddr)>> {
         let (io, addr) = ready!(self.poll_accept_std(lw)?);
 
         let io = mio_uds::UnixStream::from_stream(io)?;
         Poll::Ready(Ok((UnixStream::new(io), addr)))
     }
 
-    fn poll_accept_std(&self, lw: &LocalWaker) -> Poll<io::Result<(net::UnixStream, SocketAddr)>> {
+    fn poll_accept_std(&self, lw: &Waker) -> Poll<io::Result<(net::UnixStream, SocketAddr)>> {
         ready!(self.io.poll_read_ready(lw)?);
 
         match self.io.get_ref().accept_std() {
@@ -180,7 +180,7 @@ impl Incoming {
 impl Stream for Incoming {
     type Item = io::Result<UnixStream>;
 
-    fn poll_next(self: Pin<&mut Self>, lw: &LocalWaker) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, lw: &Waker) -> Poll<Option<Self::Item>> {
         let (socket, _) = ready!(self.inner.poll_accept(lw)?);
         Poll::Ready(Some(Ok(socket)))
     }

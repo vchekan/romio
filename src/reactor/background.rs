@@ -1,6 +1,6 @@
 use super::{Handle, Reactor};
 
-use futures::task::{AtomicWaker, LocalWaker};
+use futures::task::{AtomicWaker, Waker};
 use futures::{executor, Future, Poll};
 use log::debug;
 
@@ -107,7 +107,7 @@ impl Drop for Background {
 impl Future for Shutdown {
     type Output = Result<(), ()>;
 
-    fn poll(self: Pin<&mut Self>, lw: &LocalWaker) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, lw: &Waker) -> Poll<Self::Output> {
         self.inner.shared.shutdown_task.register(lw);
 
         if !self.inner.is_shutdown() {

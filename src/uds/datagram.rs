@@ -1,6 +1,6 @@
 use crate::reactor::PollEvented;
 
-use futures::task::LocalWaker;
+use futures::task::Waker;
 use futures::{ready, Poll};
 use mio::Ready;
 use mio_uds;
@@ -79,12 +79,12 @@ impl UnixDatagram {
     }
 
     /// Test whether this socket is ready to be read or not.
-    pub fn poll_read_ready(&self, lw: &LocalWaker) -> Poll<io::Result<Ready>> {
+    pub fn poll_read_ready(&self, lw: &Waker) -> Poll<io::Result<Ready>> {
         self.io.poll_read_ready(lw)
     }
 
     /// Test whether this socket is ready to be written to or not.
-    pub fn poll_write_ready(&self, lw: &LocalWaker) -> Poll<io::Result<Ready>> {
+    pub fn poll_write_ready(&self, lw: &Waker) -> Poll<io::Result<Ready>> {
         self.io.poll_write_ready(lw)
     }
 
@@ -127,7 +127,7 @@ impl UnixDatagram {
     /// whence the data came.
     pub fn poll_recv_from(
         &self,
-        lw: &LocalWaker,
+        lw: &Waker,
         buf: &mut [u8],
     ) -> Poll<io::Result<(usize, SocketAddr)>> {
         ready!(self.io.poll_read_ready(lw)?);
@@ -147,7 +147,7 @@ impl UnixDatagram {
     /// On success, returns the number of bytes written.
     pub fn poll_send_to(
         &self,
-        lw: &LocalWaker,
+        lw: &Waker,
         buf: &[u8],
         path: impl AsRef<Path>,
     ) -> Poll<io::Result<usize>> {

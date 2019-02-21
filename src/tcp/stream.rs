@@ -6,7 +6,7 @@ use std::pin::Pin;
 use std::time::Duration;
 
 use futures::io::{AsyncRead, AsyncWrite};
-use futures::task::LocalWaker;
+use futures::task::Waker;
 use futures::{ready, Future, Poll};
 use iovec::IoVec;
 use mio;
@@ -90,7 +90,7 @@ impl TcpStream {
     ///
     /// Once the stream is ready for reading, it will remain so until all available
     /// bytes have been extracted (via `futures::io::AsyncRead` and related traits).
-    pub fn poll_read_ready(&self, lw: &LocalWaker) -> Poll<io::Result<mio::Ready>> {
+    pub fn poll_read_ready(&self, lw: &Waker) -> Poll<io::Result<mio::Ready>> {
         self.io.poll_read_ready(lw)
     }
 
@@ -108,7 +108,7 @@ impl TcpStream {
     /// # Panics
     ///
     /// This function panics if called from outside of a task context.
-    pub fn poll_write_ready(&self, lw: &LocalWaker) -> Poll<io::Result<mio::Ready>> {
+    pub fn poll_write_ready(&self, lw: &Waker) -> Poll<io::Result<mio::Ready>> {
         self.io.poll_write_ready(lw)
     }
 
@@ -482,13 +482,13 @@ impl TcpStream {
 // ===== impl Read / Write =====
 
 impl AsyncRead for TcpStream {
-    fn poll_read(&mut self, lw: &LocalWaker, buf: &mut [u8]) -> Poll<io::Result<usize>> {
+    fn poll_read(&mut self, lw: &Waker, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         <&TcpStream>::poll_read(&mut &*self, lw, buf)
     }
 
     fn poll_vectored_read(
         &mut self,
-        lw: &LocalWaker,
+        lw: &Waker,
         vec: &mut [&mut IoVec],
     ) -> Poll<io::Result<usize>> {
         <&TcpStream>::poll_vectored_read(&mut &*self, lw, vec)
@@ -496,19 +496,19 @@ impl AsyncRead for TcpStream {
 }
 
 impl AsyncWrite for TcpStream {
-    fn poll_write(&mut self, lw: &LocalWaker, buf: &[u8]) -> Poll<io::Result<usize>> {
+    fn poll_write(&mut self, lw: &Waker, buf: &[u8]) -> Poll<io::Result<usize>> {
         <&TcpStream>::poll_write(&mut &*self, lw, buf)
     }
 
-    fn poll_vectored_write(&mut self, lw: &LocalWaker, vec: &[&IoVec]) -> Poll<io::Result<usize>> {
+    fn poll_vectored_write(&mut self, lw: &Waker, vec: &[&IoVec]) -> Poll<io::Result<usize>> {
         <&TcpStream>::poll_vectored_write(&mut &*self, lw, vec)
     }
 
-    fn poll_flush(&mut self, lw: &LocalWaker) -> Poll<io::Result<()>> {
+    fn poll_flush(&mut self, lw: &Waker) -> Poll<io::Result<()>> {
         <&TcpStream>::poll_flush(&mut &*self, lw)
     }
 
-    fn poll_close(&mut self, lw: &LocalWaker) -> Poll<io::Result<()>> {
+    fn poll_close(&mut self, lw: &Waker) -> Poll<io::Result<()>> {
         <&TcpStream>::poll_close(&mut &*self, lw)
     }
 }
@@ -516,13 +516,13 @@ impl AsyncWrite for TcpStream {
 // ===== impl Read / Write for &'a =====
 
 impl<'a> AsyncRead for &'a TcpStream {
-    fn poll_read(&mut self, lw: &LocalWaker, buf: &mut [u8]) -> Poll<io::Result<usize>> {
+    fn poll_read(&mut self, lw: &Waker, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         (&self.io).poll_read(lw, buf)
     }
 
     fn poll_vectored_read(
         &mut self,
-        lw: &LocalWaker,
+        lw: &Waker,
         bufs: &mut [&mut IoVec],
     ) -> Poll<io::Result<usize>> {
         ready!(self.poll_read_ready(lw)?);
@@ -539,11 +539,11 @@ impl<'a> AsyncRead for &'a TcpStream {
 }
 
 impl<'a> AsyncWrite for &'a TcpStream {
-    fn poll_write(&mut self, lw: &LocalWaker, buf: &[u8]) -> Poll<io::Result<usize>> {
+    fn poll_write(&mut self, lw: &Waker, buf: &[u8]) -> Poll<io::Result<usize>> {
         (&self.io).poll_write(lw, buf)
     }
 
-    fn poll_vectored_write(&mut self, lw: &LocalWaker, bufs: &[&IoVec]) -> Poll<io::Result<usize>> {
+    fn poll_vectored_write(&mut self, lw: &Waker, bufs: &[&IoVec]) -> Poll<io::Result<usize>> {
         ready!(self.poll_write_ready(lw)?);
 
         let r = self.io.get_ref().write_bufs(bufs);
@@ -555,11 +555,11 @@ impl<'a> AsyncWrite for &'a TcpStream {
         return Poll::Ready(r);
     }
 
-    fn poll_flush(&mut self, lw: &LocalWaker) -> Poll<io::Result<()>> {
+    fn poll_flush(&mut self, lw: &Waker) -> Poll<io::Result<()>> {
         (&self.io).poll_flush(lw)
     }
 
-    fn poll_close(&mut self, lw: &LocalWaker) -> Poll<io::Result<()>> {
+    fn poll_close(&mut self, lw: &Waker) -> Poll<io::Result<()>> {
         (&self.io).poll_close(lw)
     }
 }
@@ -573,7 +573,7 @@ impl fmt::Debug for TcpStream {
 impl Future for ConnectFuture {
     type Output = io::Result<TcpStream>;
 
-    fn poll(mut self: Pin<&mut Self>, lw: &LocalWaker) -> Poll<io::Result<TcpStream>> {
+    fn poll(mut self: Pin<&mut Self>, lw: &Waker) -> Poll<io::Result<TcpStream>> {
         Pin::new(&mut self.inner).poll(lw)
     }
 }
@@ -621,7 +621,7 @@ impl ConnectFutureState {
 impl Future for ConnectFutureState {
     type Output = io::Result<TcpStream>;
 
-    fn poll(mut self: Pin<&mut Self>, lw: &LocalWaker) -> Poll<io::Result<TcpStream>> {
+    fn poll(mut self: Pin<&mut Self>, lw: &Waker) -> Poll<io::Result<TcpStream>> {
         self.poll_inner(|io| io.poll_write_ready(lw))
     }
 }

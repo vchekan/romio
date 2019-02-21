@@ -6,7 +6,7 @@ use std::net::{self, SocketAddr};
 use std::pin::Pin;
 
 use futures::stream::Stream;
-use futures::task::LocalWaker;
+use futures::task::Waker;
 use futures::{ready, Poll};
 use mio;
 
@@ -194,7 +194,7 @@ impl TcpListener {
         self.io.get_ref().set_ttl(ttl)
     }
 
-    fn poll_accept(&mut self, lw: &LocalWaker) -> Poll<io::Result<(TcpStream, SocketAddr)>> {
+    fn poll_accept(&mut self, lw: &Waker) -> Poll<io::Result<(TcpStream, SocketAddr)>> {
         let (io, addr) = ready!(self.poll_accept_std(lw)?);
 
         let io = mio::net::TcpStream::from_stream(io)?;
@@ -205,7 +205,7 @@ impl TcpListener {
 
     fn poll_accept_std(
         &mut self,
-        lw: &LocalWaker,
+        lw: &Waker,
     ) -> Poll<io::Result<(net::TcpStream, SocketAddr)>> {
         ready!(self.io.poll_read_ready(lw)?);
 
@@ -249,7 +249,7 @@ pub struct Incoming<'a> {
 impl<'a> Stream for Incoming<'a> {
     type Item = io::Result<TcpStream>;
 
-    fn poll_next(mut self: Pin<&mut Self>, lw: &LocalWaker) -> Poll<Option<Self::Item>> {
+    fn poll_next(mut self: Pin<&mut Self>, lw: &Waker) -> Poll<Option<Self::Item>> {
         let (socket, _) = ready!(self.inner.poll_accept(lw)?);
         Poll::Ready(Some(Ok(socket)))
     }

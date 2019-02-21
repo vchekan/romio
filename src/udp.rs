@@ -16,7 +16,7 @@ use std::io;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::pin::Pin;
 
-use futures::task::LocalWaker;
+use futures::task::Waker;
 use futures::Future;
 use futures::{ready, Poll};
 use mio;
@@ -146,7 +146,7 @@ impl UdpSocket {
     /// notification when the socket becomes writable.
     pub fn poll_send_to(
         &mut self,
-        lw: &LocalWaker,
+        lw: &Waker,
         buf: &[u8],
         target: &SocketAddr,
     ) -> Poll<io::Result<usize>> {
@@ -168,7 +168,7 @@ impl UdpSocket {
     /// notification when the socket becomes readable.
     pub fn poll_recv_from(
         &mut self,
-        lw: &LocalWaker,
+        lw: &Waker,
         buf: &mut [u8],
     ) -> Poll<io::Result<(usize, SocketAddr)>> {
         ready!(self.io.poll_read_ready(lw)?);
@@ -190,7 +190,7 @@ impl UdpSocket {
     ///
     /// The socket will remain in a read-ready state until calls to `poll_recv`
     /// return `Pending`.
-    pub fn poll_read_ready(&self, lw: &LocalWaker) -> Poll<io::Result<mio::Ready>> {
+    pub fn poll_read_ready(&self, lw: &Waker) -> Poll<io::Result<mio::Ready>> {
         self.io.poll_read_ready(lw)
     }
 
@@ -201,7 +201,7 @@ impl UdpSocket {
     ///
     /// The I/O resource will remain in a write-ready state until calls to
     /// `poll_send` return `Pending`.
-    pub fn poll_write_ready(&self, lw: &LocalWaker) -> Poll<io::Result<mio::Ready>> {
+    pub fn poll_write_ready(&self, lw: &Waker) -> Poll<io::Result<mio::Ready>> {
         self.io.poll_write_ready(lw)
     }
 
@@ -399,7 +399,7 @@ pub struct SendTo<'a, 'b> {
 impl<'a, 'b> Future for SendTo<'a, 'b> {
     type Output = io::Result<usize>;
 
-    fn poll(mut self: Pin<&mut Self>, lw: &LocalWaker) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, lw: &Waker) -> Poll<Self::Output> {
         let SendTo { socket, buf, target } = &mut *self;
         socket.poll_send_to(lw, buf, target)
     }
@@ -415,7 +415,7 @@ pub struct RecvFrom<'a, 'b> {
 impl<'a, 'b> Future for RecvFrom<'a, 'b> {
     type Output = io::Result<(usize, SocketAddr)>;
 
-    fn poll(mut self: Pin<&mut Self>, lw: &LocalWaker) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, lw: &Waker) -> Poll<Self::Output> {
         let RecvFrom { socket, buf } = &mut *self;
         socket.poll_recv_from(lw, buf)
     }

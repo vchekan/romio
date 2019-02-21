@@ -3,7 +3,7 @@ use super::ucred::{self, UCred};
 use crate::reactor::PollEvented;
 
 use futures::io::{AsyncRead, AsyncWrite};
-use futures::task::LocalWaker;
+use futures::task::Waker;
 use futures::{ready, Future, Poll};
 use iovec::IoVec;
 use mio::Ready;
@@ -97,12 +97,12 @@ impl UnixStream {
     }
 
     /// Test whether this socket is ready to be read or not.
-    pub fn poll_read_ready(&self, lw: &LocalWaker) -> Poll<io::Result<Ready>> {
+    pub fn poll_read_ready(&self, lw: &Waker) -> Poll<io::Result<Ready>> {
         self.io.poll_read_ready(lw)
     }
 
     /// Test whether this socket is ready to be written to or not.
-    pub fn poll_write_ready(&self, lw: &LocalWaker) -> Poll<io::Result<Ready>> {
+    pub fn poll_write_ready(&self, lw: &Waker) -> Poll<io::Result<Ready>> {
         self.io.poll_write_ready(lw)
     }
 
@@ -198,13 +198,13 @@ impl UnixStream {
 }
 
 impl AsyncRead for UnixStream {
-    fn poll_read(&mut self, lw: &LocalWaker, buf: &mut [u8]) -> Poll<io::Result<usize>> {
+    fn poll_read(&mut self, lw: &Waker, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         <&UnixStream>::poll_read(&mut &*self, lw, buf)
     }
 
     fn poll_vectored_read(
         &mut self,
-        lw: &LocalWaker,
+        lw: &Waker,
         vec: &mut [&mut IoVec],
     ) -> Poll<io::Result<usize>> {
         <&UnixStream>::poll_vectored_read(&mut &*self, lw, vec)
@@ -212,31 +212,31 @@ impl AsyncRead for UnixStream {
 }
 
 impl AsyncWrite for UnixStream {
-    fn poll_write(&mut self, lw: &LocalWaker, buf: &[u8]) -> Poll<io::Result<usize>> {
+    fn poll_write(&mut self, lw: &Waker, buf: &[u8]) -> Poll<io::Result<usize>> {
         <&UnixStream>::poll_write(&mut &*self, lw, buf)
     }
 
-    fn poll_vectored_write(&mut self, lw: &LocalWaker, vec: &[&IoVec]) -> Poll<io::Result<usize>> {
+    fn poll_vectored_write(&mut self, lw: &Waker, vec: &[&IoVec]) -> Poll<io::Result<usize>> {
         <&UnixStream>::poll_vectored_write(&mut &*self, lw, vec)
     }
 
-    fn poll_flush(&mut self, lw: &LocalWaker) -> Poll<io::Result<()>> {
+    fn poll_flush(&mut self, lw: &Waker) -> Poll<io::Result<()>> {
         <&UnixStream>::poll_flush(&mut &*self, lw)
     }
 
-    fn poll_close(&mut self, lw: &LocalWaker) -> Poll<io::Result<()>> {
+    fn poll_close(&mut self, lw: &Waker) -> Poll<io::Result<()>> {
         <&UnixStream>::poll_close(&mut &*self, lw)
     }
 }
 
 impl<'a> AsyncRead for &'a UnixStream {
-    fn poll_read(&mut self, lw: &LocalWaker, buf: &mut [u8]) -> Poll<io::Result<usize>> {
+    fn poll_read(&mut self, lw: &Waker, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         (&self.io).poll_read(lw, buf)
     }
 
     fn poll_vectored_read(
         &mut self,
-        lw: &LocalWaker,
+        lw: &Waker,
         bufs: &mut [&mut IoVec],
     ) -> Poll<io::Result<usize>> {
         ready!(self.poll_read_ready(lw)?);
@@ -253,11 +253,11 @@ impl<'a> AsyncRead for &'a UnixStream {
 }
 
 impl<'a> AsyncWrite for &'a UnixStream {
-    fn poll_write(&mut self, lw: &LocalWaker, buf: &[u8]) -> Poll<io::Result<usize>> {
+    fn poll_write(&mut self, lw: &Waker, buf: &[u8]) -> Poll<io::Result<usize>> {
         (&self.io).poll_write(lw, buf)
     }
 
-    fn poll_vectored_write(&mut self, lw: &LocalWaker, bufs: &[&IoVec]) -> Poll<io::Result<usize>> {
+    fn poll_vectored_write(&mut self, lw: &Waker, bufs: &[&IoVec]) -> Poll<io::Result<usize>> {
         ready!(self.poll_write_ready(lw)?);
 
         let r = self.io.get_ref().write_bufs(bufs);
@@ -269,11 +269,11 @@ impl<'a> AsyncWrite for &'a UnixStream {
         return Poll::Ready(r);
     }
 
-    fn poll_flush(&mut self, lw: &LocalWaker) -> Poll<io::Result<()>> {
+    fn poll_flush(&mut self, lw: &Waker) -> Poll<io::Result<()>> {
         (&self.io).poll_flush(lw)
     }
 
-    fn poll_close(&mut self, lw: &LocalWaker) -> Poll<io::Result<()>> {
+    fn poll_close(&mut self, lw: &Waker) -> Poll<io::Result<()>> {
         (&self.io).poll_close(lw)
     }
 }
@@ -293,7 +293,7 @@ impl AsRawFd for UnixStream {
 impl Future for ConnectFuture {
     type Output = io::Result<UnixStream>;
 
-    fn poll(mut self: Pin<&mut Self>, lw: &LocalWaker) -> Poll<io::Result<UnixStream>> {
+    fn poll(mut self: Pin<&mut Self>, lw: &Waker) -> Poll<io::Result<UnixStream>> {
         use std::mem;
 
         match self.inner {
